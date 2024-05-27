@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 )
 
 func main() {
@@ -43,12 +44,33 @@ func main() {
 	slope, intercept := calculateRegression(x_train, y_train)
 	fmt.Printf("Slope: %.2f, Intercept: %.2f\n", slope, intercept)
 
-	// Calcular y mostrar los valores de y para 1000 diferentes valores de x
+	// Canal para resultados
+	results := make(chan string, 1000)
+
+	// Grupo de espera para goroutines
+	var wg sync.WaitGroup
+
+	// Calcular y mostrar los valores de y para 1000 diferentes valores de x usando goroutines
 	initialX := 1.0
 	for i := 0; i < 1000; i++ {
-		x := initialX + float64(i)
-		y := slope*x + intercept
-		fmt.Printf("Para x = %.2f, el valor predicho de y es: %.2f\n", x, y)
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			x := initialX + float64(i)
+			y := slope*x + intercept
+			results <- fmt.Sprintf("Para x = %.2f, el valor predicho de y es: %.2f\n", x, y)
+		}(i)
+	}
+
+	// Cerrar el canal cuando todas las goroutines terminen
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Recibir y mostrar resultados del canal
+	for result := range results {
+		fmt.Print(result)
 	}
 }
 
@@ -68,3 +90,4 @@ func calculateRegression(x, y []float64) (float64, float64) {
 
 	return slope, intercept
 }
+
